@@ -1,0 +1,450 @@
+mixed-port: 7890
+allow-lan: true
+bind-address: "*"
+mode: rule
+log-level: info
+external-controller: 127.0.0.1:9090
+
+dns:
+  enable: true
+  enhanced-mode: fake-ip
+  fake-ip-range: 198.18.0.1/16
+  default-nameserver:
+    - 223.5.5.5
+  nameserver:
+    - tls://8.8.4.4
+    - tls://1.1.1.1
+  nameserver-policy:
+    "geosite:cn,private":
+      - https://doh.pub/dns-query
+      - https://dns.alidns.com/dns-query
+  fake-ip-filter:
+    - "*.lan"
+    - +.msftncsi.com
+    - +.msftconnecttest.com
+    - +.xboxlive.com
+    - nmcheck.gnome.org
+    - networkcheck.kde.org
+    - ping.archlinux.org
+    - localhost.ptlogin2.qq.com
+    - +.srv.nintendo.net
+    - +.stun.playstation.net
+    - +.pool.ntp.org
+
+tun:
+  enable: true
+  stack: system
+  dns-hijack:
+    - any:53
+  auto-route: true
+  auto-detect-interface: true
+
+proxy-providers:
+  Subs:
+    type: http
+    path: ./Proxies/Subs.yaml
+    url: **
+    interval: 86400 # 一天
+    health-check:
+      enable: true
+      url: https://www.gstatic.com/generate_204
+      interval: 600
+  # Subs2:
+  #   type: http
+  #   path: ./Proxies/Subs2.yaml
+  #   url: 替换成机场2订阅链接
+  #   interval: 86400 # 一天
+  #   health-check:
+  #     enable: true
+  #     url: https://www.gstatic.com/generate_204
+  #     interval: 600
+
+######### 锚点 start #######
+SELECTL_PROXIES:
+  &SELECTL_PROXIES {
+    type: select,
+    proxies:
+      [
+        代理节点,
+        🇭🇰香港节点,
+        🇹🇼台湾节点,
+        🇸🇬新加坡节点,
+        🇯🇵日本节点,
+        🇺🇸美国节点,
+        低倍率节点,
+        自动选择,
+        手动选择,
+        DIRECT,
+      ],
+  }
+
+URLTEST:
+  &URLTEST {
+    type: url-test,
+    url: https://www.gstatic.com/generate_204,
+    interval: 600,
+    tolerance: 50,
+    lazy: true,
+  }
+######### 锚点 end #######
+
+proxy-groups:
+  - name: 🔯 代理模式 
+    type: select
+    proxies:
+      - 绕过大陆丨黑名单(GFWlist) # 黑名单模式，意为「只有命中规则的网络流量，才使用代理」
+      - 绕过大陆丨白名单(Whitelist) # 白名单模式，意为「没有命中规则的网络流量，统统使用代理」
+
+  - name: 代理节点
+    type: select
+    proxies:
+      - Fallback
+      - 🇭🇰香港节点
+      - 🇹🇼台湾节点
+      - 🇸🇬新加坡节点
+      - 🇯🇵日本节点
+      - 🇺🇸美国节点
+      - 自动选择
+      - 手动选择
+      - 低倍率节点
+
+  - name: 自动选择
+    <<: *URLTEST
+    use:
+      - Subs
+      # - Subs2
+    exclude-filter: AWS
+
+  - name: 手动选择
+    type: select
+    use:
+      - Subs
+
+  - name: Spotify
+    <<: *SELECTL_PROXIES
+
+  - name: qbittorrent
+    type: select
+    use:
+      - Subs
+    proxies:
+      - DIRECT
+
+  - name: 谷歌翻译
+    type: select
+    use:
+      - Subs
+    proxies:
+      - 自动选择
+      
+  - name: 绕过大陆丨黑名单(GFWlist)
+    type: url-test
+    url: http://www.gstatic.com/generate_204
+    interval: 86400
+    proxies:
+      - DIRECT
+            
+  - name: 绕过大陆丨白名单(Whitelist)
+    type: url-test
+    url: http://www.gstatic.com/generate_204
+    interval: 86400
+    proxies:
+      - PROXY
+
+  - name: PROXY
+    type: url-test
+    url: http://www.gstatic.com/generate_204
+    interval: 86400
+    proxies:
+      - 手动选择
+
+  - name: Telegram
+    <<: *SELECTL_PROXIES
+
+  - name: TikTok
+    <<: *SELECTL_PROXIES
+
+  - name: Twitch
+    <<: *SELECTL_PROXIES
+
+  - name: Youtube
+    <<: *SELECTL_PROXIES
+
+  - name: Steam
+    <<: *SELECTL_PROXIES
+
+  - name: Xbox # add `www.msftconnecttest.com` to dns fake-ip-filter
+    <<: *SELECTL_PROXIES
+
+  - name: Google
+    <<: *SELECTL_PROXIES
+
+  - name: Apple
+    <<: *SELECTL_PROXIES
+
+  - name: iCloud
+    <<: *SELECTL_PROXIES
+
+  - name: Netflix
+    type: select
+    proxies:
+      - 流媒体解锁
+      - 手动选择
+      - DIRECT
+
+  - name: Final
+    type: select
+    proxies:
+      - DIRECT
+      - 代理节点
+      - 自动选择
+      - 手动选择
+
+  - name: 流媒体解锁
+    type: select
+    use:
+      - Subs
+    filter: \[M\]
+
+  - name: 低倍率节点
+    type: select
+    use:
+      - Subs
+    filter: 0.01|0.1
+    exclude-filter: 倍率\:2\.5
+
+  - name: Fallback
+    type: fallback
+    url: https://www.gstatic.com/generate_204
+    interval: 600
+    proxies:
+      - 🇭🇰香港节点
+      - 🇹🇼台湾节点
+      - 🇸🇬新加坡节点
+      - 🇯🇵日本节点
+      - 🇺🇸美国节点
+
+  - name: 🇭🇰香港节点
+    <<: *URLTEST
+    use:
+      - Subs
+    filter: (?i)HK|香港|港|Hong Kong
+
+  - name: 🇹🇼台湾节点
+    <<: *URLTEST
+    use:
+      - Subs
+    filter: (?i)TW|台湾|台|Taiwan
+
+  - name: 🇸🇬新加坡节点
+    <<: *URLTEST
+    use:
+      - Subs
+    filter: (?i)SG|新加坡|坡|Singapore
+
+  - name: 🇯🇵日本节点
+    <<: *URLTEST
+    use:
+      - Subs
+    filter: (?i)JP|日本|日|Japan
+
+  - name: 🇺🇸美国节点
+    <<: *URLTEST
+    use:
+      - Subs
+    filter: (?i)US|美国|美|United States
+
+  - name: 广告域名
+    type: select
+    proxies:
+      - REJECT
+      - DIRECT
+
+rules:
+  - PROCESS-NAME,aria2c.exe,手动选择
+  - DOMAIN-SUFFIX,cf.imetyou.top,DIRECT
+  - PROCESS-NAME,dota2.exe,qbittorrent
+  - DOMAIN,pdf.sciencedirectassets.com,DIRECT
+  - PROCESS-NAME,qbittorrent.exe,qbittorrent
+  - PROCESS-NAME,TslGame.exe,DIRECT
+  - DOMAIN-SUFFIX,dailyfxasia.com,手动选择
+  - DOMAIN-SUFFIX,deepl.com,谷歌翻译
+  - DOMAIN,static.deepl.com,谷歌翻译
+  - DOMAIN,www.deepl.com,谷歌翻译
+  - DOMAIN,chat.openai.com,手动选择
+  - DOMAIN,translate.googleapis.com,谷歌翻译
+  - DOMAIN,translate.google.com,谷歌翻译
+  - DOMAIN,s.1b2a.net,DIRECT
+  - DOMAIN-SUFFIX,sentry.io,REJECT
+  - DOMAIN-SUFFIX,freeok.vip,DIRECT
+  - DOMAIN-SUFFIX,www.btnull.org,DIRECT
+  - DOMAIN-SUFFIX,www.sciencedirect.com,DIRECT
+  - RULE-SET,applications,DIRECT # 需要直连的常见软件列表
+  - DOMAIN,clash.razord.top,DIRECT # Clash 面板
+  - DOMAIN,yacd.haishan.me,DIRECT # Clash 面板
+  - RULE-SET,private,DIRECT # 私有网络专用域名列表
+  - RULE-SET,reject,广告域名 # 广告域名列表
+  - RULE-SET,icloud,iCloud # iCloud 域名列表
+  - RULE-SET,apple,Apple # Apple 在中国大陆可直连的域名列表
+  - GEOIP,CN,DIRECT
+  - RULE-SET,spotify,Spotify
+  - RULE-SET,jingdong,DIRECT
+  - RULE-SET,tiktok,TikTok
+  - RULE-SET,twitch,Twitch
+  - RULE-SET,youtube,Youtube
+  - RULE-SET,netflix,Netflix
+  - RULE-SET,google,Google
+  - RULE-SET,steamcn,DIRECT
+  - RULE-SET,steam,Steam
+  - RULE-SET,xbox,Xbox
+  - RULE-SET,bing,代理节点
+  - RULE-SET,proxy,🔯 代理模式 # 代理域名列表
+  - RULE-SET,telegramcidr,Telegram # Telegram 使用的 IP 地址列表
+  - RULE-SET,direct,DIRECT # 直连域名列表
+  - RULE-SET,lancidr,DIRECT # 局域网 IP 及保留 IP 地址列表
+  - RULE-SET,tld-not-cn,代理节点 # 非中国大陆使用的顶级域名列表
+  - RULE-SET,gfw,代理节点 # GFWList 域名列表
+  - GEOIP,cn,DIRECT
+
+  - MATCH,🔯 代理模式
+
+rule-providers:
+  spotify:
+    type: http
+    behavior: classical
+    url: https://gh-proxy.com/https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Clash/Spotify/Spotify.yaml
+    path: ./providers/rule/spotify.yaml
+    interval: 86400
+
+  apple:
+    type: http
+    behavior: domain
+    url: https://gh-proxy.com/https://raw.githubusercontent.com/Loyalsoldier/clash-rules/release/apple.txt
+    path: ./providers/rule/apple.yaml
+    interval: 86400
+  applications:
+    type: http
+    behavior: classical
+    url: https://gh-proxy.com/https://raw.githubusercontent.com/Loyalsoldier/clash-rules/release/applications.txt
+    path: ./providers/rule/applications.yaml
+    interval: 86400
+  cncidr:
+    type: http
+    behavior: ipcidr
+    url: https://gh-proxy.com/https://raw.githubusercontent.com/Loyalsoldier/clash-rules/release/cncidr.txt
+    path: ./providers/rule/cncidr.yaml
+    interval: 86400
+  direct:
+    type: http
+    behavior: domain
+    url: https://gh-proxy.com/https://raw.githubusercontent.com/Loyalsoldier/clash-rules/release/direct.txt
+    path: ./providers/rule/direct.yaml
+    interval: 86400
+  gfw:
+    type: http
+    behavior: domain
+    url: https://gh-proxy.com/https://raw.githubusercontent.com/Loyalsoldier/clash-rules/release/gfw.txt
+    path: ./providers/rule/gfw.yaml
+    interval: 86400
+  icloud:
+    type: http
+    behavior: domain
+    url: https://gh-proxy.com/https://raw.githubusercontent.com/Loyalsoldier/clash-rules/release/icloud.txt
+    path: ./providers/rule/icloud.yaml
+    interval: 86400
+  lancidr:
+    type: http
+    behavior: ipcidr
+    url: https://gh-proxy.com/https://raw.githubusercontent.com/Loyalsoldier/clash-rules/release/lancidr.txt
+    path: ./providers/rule/lancidr.yaml
+    interval: 86400
+  private:
+    type: http
+    behavior: domain
+    url: https://gh-proxy.com/https://raw.githubusercontent.com/Loyalsoldier/clash-rules/release/private.txt
+    path: ./providers/rule/private.yaml
+    interval: 86400
+  proxy:
+    type: http
+    behavior: domain
+    url: https://gh-proxy.com/https://raw.githubusercontent.com/Loyalsoldier/clash-rules/release/proxy.txt
+    path: ./providers/rule/proxy.yaml
+    interval: 86400
+  reject:
+    type: http
+    behavior: domain
+    url: https://gh-proxy.com/https://raw.githubusercontent.com/Loyalsoldier/clash-rules/release/reject.txt
+    path: ./providers/rule/reject.yaml
+    interval: 86400
+  telegramcidr:
+    type: http
+    behavior: ipcidr
+    url: https://gh-proxy.com/https://raw.githubusercontent.com/Loyalsoldier/clash-rules/release/telegramcidr.txt
+    path: ./providers/rule/telegramcidr.yaml
+    interval: 86400
+  tld-not-cn:
+    type: http
+    behavior: domain
+    url: https://gh-proxy.com/https://raw.githubusercontent.com/Loyalsoldier/clash-rules/release/tld-not-cn.txt
+    path: ./providers/rule/tld-not-cn.yaml
+    interval: 86400
+  tiktok:
+    type: http
+    behavior: classical
+    url: https://gh-proxy.com/https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Clash/TikTok/TikTok.yaml
+    path: ./providers/rule/tiktok.yaml
+    interval: 86400
+  twitch:
+    type: http
+    behavior: classical
+    url: https://gh-proxy.com/https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Clash/Twitch/Twitch.yaml
+    path: ./providers/rule/twitch.yaml
+    interval: 86400
+  youtube:
+    type: http
+    behavior: classical
+    url: https://gh-proxy.com/https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Clash/YouTube/YouTube.yaml
+    path: ./providers/rule/youtube.yaml
+    interval: 86400
+  netflix:
+    type: http
+    behavior: classical
+    url: https://gh-proxy.com/https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Clash/Netflix/Netflix_Classical.yaml
+    path: ./providers/rule/netflix.yaml
+    interval: 86400
+  jingdong:
+    type: http
+    behavior: classical
+    url: https://gh-proxy.com/https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Clash/JingDong/JingDong.yaml
+    path: ./providers/rule/jingdong.yaml
+    interval: 86400
+  google:
+    type: http
+    behavior: classical
+    url: https://gh-proxy.com/https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Clash/Google/Google.yaml
+    path: ./providers/rule/google.yaml
+    interval: 86400
+  steamcn:
+    type: http
+    behavior: classical
+    url: https://gh-proxy.com/https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Clash/SteamCN/SteamCN.yaml
+    path: ./providers/rule/steamcn.yaml
+    interval: 86400
+  steam:
+    type: http
+    behavior: classical
+    url: https://gh-proxy.com/https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Clash/Steam/Steam.yaml
+    path: ./providers/rule/steam.yaml
+    interval: 86400
+  xbox:
+    type: http
+    behavior: classical
+    url: https://gh-proxy.com/https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Clash/Xbox/Xbox.yaml
+    path: ./providers/rule/xbox.yaml
+    interval: 86400
+  bing:
+    type: http
+    behavior: classical
+    url: https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Clash/Bing/Bing.yaml
+    path: ./providers/rule/bing.yaml
+    interval: 86400
